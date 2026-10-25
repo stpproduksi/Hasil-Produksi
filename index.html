@@ -179,7 +179,7 @@ function fgSimpanCetak(){
     .then(r=>r.text())
     .then(t=>{
       var res;
-      try{ res=JSON.parse(t); }catch(e){ res={ok:false,error:t}; }
+      try{ res=JSON.parse(t); }catch(e){ res={ok:false,error:'Respon server: '+t.slice(0,200)}; }
       if(res&&res.ok&&res.palet){
         payload.palet=res.palet;
         fgLast=payload;
@@ -190,7 +190,8 @@ function fgSimpanCetak(){
         setTimeout(function(){ window.print(); }, 200);
       } else {
         btn.disabled=false;
-        setMsg('❌ Gagal: '+((res&&res.error)||'tidak diketahui'),'bad');
+        var pesan=(res&&res.error) ? res.error : 'Server tidak mengembalikan No. Palet. Cek deploy Apps Script.';
+        setMsg('❌ Gagal: '+pesan,'bad');
       }
     })
     .catch(e=>{ btn.disabled=false; setMsg('❌ Gagal: '+e.message,'bad'); });
