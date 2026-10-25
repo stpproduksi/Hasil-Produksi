@@ -21,6 +21,7 @@
   .field input,.field select{width:100%;padding:11px 12px;font-size:15px;border:1px solid var(--line);border-radius:8px;background:#fff;}
   .field input:disabled,.field select:disabled{background:#F3F4F6;color:var(--mute);}
   .field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(29,78,137,.15);}
+  .hint{font-size:11.5px;color:var(--mute);margin:-6px 0 14px;}
   .btn{width:100%;padding:13px;font-size:14px;font-weight:700;border:none;border-radius:8px;color:#fff;cursor:pointer;margin-top:8px;}
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   #btnSave{background:var(--accent);margin-top:4px;}
@@ -70,16 +71,16 @@
   <div class="field"><label>Nama Produk</label><select id="fProduk"><option value="">- memuat daftar -</option></select></div>
 
   <div class="row2">
-    <div class="field"><label>No. Palet</label><input type="text" id="fPalet" placeholder="Nomor palet"></div>
     <div class="field"><label>Qty</label><input type="number" id="fQty" step="1" inputmode="numeric" placeholder="0"></div>
+    <div class="field"><label>Nama</label><input type="text" id="fNama" placeholder="Nama operator"></div>
   </div>
 
   <div class="row2">
-    <div class="field"><label>Nama</label><input type="text" id="fNama" placeholder="Nama operator"></div>
     <div class="field"><label>BS Sheet</label><input type="number" id="fBsSheet" step="any" inputmode="decimal" placeholder="0"></div>
+    <div class="field"><label>Waste</label><input type="number" id="fWaste" step="any" inputmode="decimal" placeholder="0"></div>
   </div>
 
-  <div class="field"><label>Waste</label><input type="number" id="fWaste" step="any" inputmode="decimal" placeholder="0"></div>
+  <div class="hint">No. Palet dibuat otomatis saat disimpan (format FG-YY/MM/NNN).</div>
 
   <button id="btnSave" class="btn" onclick="fgSimpanCetak()">Simpan &amp; Cetak</button>
   <button id="btnShare" class="btn" onclick="fgShareWa()" disabled>Share WA</button>
@@ -131,7 +132,7 @@ function fgMuatProduk(){
 }
 
 function fgKunci(on){
-  ['fTanggal','fShift','fTf','fJam','fProduk','fPalet','fQty','fNama','fBsSheet','fWaste'].forEach(function(id){
+  ['fTanggal','fShift','fTf','fJam','fProduk','fQty','fNama','fBsSheet','fWaste'].forEach(function(id){
     document.getElementById(id).disabled=on;
   });
   document.getElementById('btnSave').disabled=on;
@@ -143,7 +144,6 @@ function fgAmbilForm(){
     shift:document.getElementById('fShift').value,
     tf:document.getElementById('fTf').value,
     namaProduk:document.getElementById('fProduk').value,
-    palet:document.getElementById('fPalet').value.trim(),
     qty:document.getElementById('fQty').value.trim(),
     nama:document.getElementById('fNama').value.trim(),
     jam:document.getElementById('fJam').value || jamSekarang(),
@@ -157,13 +157,12 @@ function fgValidasi(d){
   if(!d.shift) return 'Shift belum dipilih';
   if(!d.tf) return 'TF belum dipilih';
   if(!d.namaProduk) return 'Nama produk belum dipilih';
-  if(!d.palet) return 'No. Palet belum diisi';
   if(!d.qty||isNaN(parseFloat(d.qty))||parseFloat(d.qty)<=0) return 'Qty belum valid';
   if(!d.nama) return 'Nama belum diisi';
   return null;
 }
 
-// 1. Simpan ke sheet FG, lalu cetak struk dengan barcode No. Palet
+// 1. Simpan ke sheet FG (palet dibuat backend), lalu cetak struk
 function fgSimpanCetak(){
   if(fgLast){ setMsg('Data sudah tersimpan. Tekan Kosongkan Form untuk input baru.','bad'); return; }
   var d=fgAmbilForm();
@@ -173,7 +172,7 @@ function fgSimpanCetak(){
   var btn=document.getElementById('btnSave');
   btn.disabled=true; setMsg('Menyimpan...','');
 
-  var payload={_app:'fg',tanggal:d.tanggal,shift:d.shift,tf:d.tf,namaProduk:d.namaProduk,palet:d.palet,
+  var payload={_app:'fg',tanggal:d.tanggal,shift:d.shift,tf:d.tf,namaProduk:d.namaProduk,
                qty:d.qty,nama:d.nama,jam:d.jam,bsSheet:d.bsSheet,waste:d.waste};
 
   fetch(WEBAPP_URL+'?action=save&payload='+encodeURIComponent(JSON.stringify(payload)))
@@ -181,16 +180,17 @@ function fgSimpanCetak(){
     .then(t=>{
       var res;
       try{ res=JSON.parse(t); }catch(e){ res={ok:false,error:t}; }
-      if(res&&res.ok){
+      if(res&&res.ok&&res.palet){
+        payload.palet=res.palet;
         fgLast=payload;
         fgKunci(true);
         document.getElementById('btnShare').disabled=false;
         fgIsiPreview(payload);
-        setMsg('✅ Tersimpan & dicetak. Tekan Share WA, lalu Kosongkan Form untuk input berikutnya.','ok');
+        setMsg('✅ Tersimpan. No. Palet '+res.palet+'. Tekan Share WA, lalu Kosongkan Form untuk input berikutnya.','ok');
         setTimeout(function(){ window.print(); }, 200);
       } else {
         btn.disabled=false;
-        setMsg('❌ Gagal: '+(res.error||'tidak diketahui'),'bad');
+        setMsg('❌ Gagal: '+((res&&res.error)||'tidak diketahui'),'bad');
       }
     })
     .catch(e=>{ btn.disabled=false; setMsg('❌ Gagal: '+e.message,'bad'); });
@@ -211,7 +211,7 @@ function fgIsiPreview(d){
   }
 }
 
-// 2. Share WA: teks dari data yang sudah tersimpan, tanpa menyimpan ulang
+// 2. Share WA: teks dari data yang sudah tersimpan, termasuk No. Palet
 function fgPesan(d){
   return "📦 HASIL PRODUKSI FG\n"+
     "Tanggal: "+fmtTglIndo(d.tanggal)+" | Jam: "+d.jam+"\n"+
@@ -230,7 +230,7 @@ function fgShareWa(){
 // 3. Kosongkan form, satu-satunya cara untuk input berikutnya
 function fgKosongkan(){
   fgLast=null;
-  ['fShift','fTf','fProduk','fPalet','fQty','fNama','fBsSheet','fWaste'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['fShift','fTf','fProduk','fQty','fNama','fBsSheet','fWaste'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('fTanggal').value=tanggalHariIni();
   document.getElementById('fJam').value=jamSekarang();
   document.getElementById('btnShare').disabled=true;
