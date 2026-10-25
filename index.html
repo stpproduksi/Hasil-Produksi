@@ -199,8 +199,8 @@ function fgSimpanCetak(){
 function fgIsiPreview(d){
   document.getElementById('pPalet').textContent='No. Palet: '+d.palet;
   document.getElementById('pProduk').textContent=d.namaProduk;
-  document.getElementById('pQty').textContent=Number(d.qty).toLocaleString('id-ID');
-  document.getElementById('pTf').textContent='TF '+d.tf;
+  document.getElementById('pQty').textContent=Number(d.qty).toLocaleString('id-ID')+' Box';
+  document.getElementById('pTf').textContent=d.tf;
   document.getElementById('pTanggal').textContent=fmtTglIndo(d.tanggal)+' '+d.jam;
   document.getElementById('pShift').textContent='SHIFT '+d.shift;
   document.getElementById('pNama').textContent=d.nama;
