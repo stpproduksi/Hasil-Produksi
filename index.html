@@ -26,14 +26,29 @@
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   #btnSave{background:var(--accent);margin-top:4px;}
   #btnPrint{background:#B45309;}
-  #btnShare{background:#25D366;}
+  #btnShareWA{background:#25D366;}
+  #btnUlang{background:#fff;color:var(--accent);border:1px solid var(--accent);}
   #btnReset{background:#fff;color:var(--mute);border:1px solid var(--line);font-size:12.5px;padding:10px;}
-  #msg{font-size:12.5px;margin-top:10px;min-height:16px;}
-  #msg.ok{color:var(--good);font-weight:700;} #msg.bad{color:var(--bad);font-weight:700;}
+  #msg{font-size:12.5px;margin-top:10px;min-height:16px;} #msg.ok{color:var(--good);font-weight:700;} #msg.bad{color:var(--bad);font-weight:700;}
+
+  #ulangPanel{display:none;margin:16px auto 0;max-width:420px;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;}
+  .ul-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .ul-head b{font-size:14px;}
+  .ul-head button{background:none;border:none;font-size:13px;color:var(--mute);cursor:pointer;font-weight:700;}
+  .ul-cari{display:flex;gap:8px;margin-bottom:10px;}
+  .ul-cari input{flex:1;padding:10px 12px;font-size:15px;border:1px solid var(--line);border-radius:7px;}
+  .ul-cari button{padding:10px 16px;font-size:14px;font-weight:700;border:none;border-radius:7px;background:var(--accent);color:#fff;cursor:pointer;}
+  #ulangList{max-height:380px;overflow-y:auto;}
+  .ul-item{border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:12.5px;}
+  .ul-item .t{font-weight:700;font-size:13px;}
+  .ul-item .s{color:var(--mute);font-size:11.5px;margin-top:2px;}
+  .ul-item button{margin-top:6px;width:100%;padding:9px;border:none;border-radius:7px;background:#B45309;color:#fff;font-weight:700;font-size:13px;cursor:pointer;}
+
   #kitirPrintArea{display:none;}
   .kitir{width:54mm;margin:0;font-family:'Roboto Mono',monospace;color:#000;padding:0;}
   .kitir .brand{text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.08em;}
   .kitir .judul{text-align:center;font-size:11.5px;font-weight:700;margin:1px 0 3px;}
+  .kitir .tag{text-align:center;font-size:11px;font-weight:700;}
   .kitir hr{border:none;border-top:1px dashed #000;margin:3px 0;}
   .kitir .ref{text-align:center;font-size:11px;font-weight:700;margin:1px 0 3px;}
   .kitir .nama{text-align:center;font-size:12px;font-weight:700;margin:3px 0;word-break:break-word;}
@@ -54,7 +69,7 @@
 </head>
 <body>
 <h1>Input Hasil Produksi</h1>
-<div class="sub">Isi data hasil produksi, lalu Simpan &amp; Cetak. Masuk ke sheet FG.</div>
+<div class="sub">Isi data hasil produksi, lalu Simpan. Masuk ke sheet FG.</div>
 
 <div id="formCard">
   <div class="row2">
@@ -85,16 +100,31 @@
 
   <div class="hint">No. Palet dibuat otomatis saat disimpan (format FG-YY/MM/NNN).</div>
 
-  <button id="btnSave" class="btn" onclick="fgSimpanCetak()">Simpan &amp; Cetak</button>
-  <button id="btnShare" class="btn" onclick="fgShareWa()" disabled>Share WA</button>
+  <button id="btnSave" class="btn" onclick="fgSimpan()">Simpan</button>
+  <button id="btnPrint" class="btn" onclick="fgCetak()" disabled>Cetak</button>
+  <button id="btnShareWA" class="btn" onclick="fgShareWa()" disabled>Share WA</button>
+  <button id="btnUlang" class="btn" onclick="fgBukaCari()">Cari Cetak Ulang</button>
   <button id="btnReset" class="btn" onclick="fgKosongkan()">Kosongkan Form</button>
   <div id="msg"></div>
+</div>
+
+<div id="ulangPanel">
+  <div class="ul-head">
+    <b>Cari Cetak Ulang</b>
+    <button type="button" onclick="fgTutupCari()">Tutup ✕</button>
+  </div>
+  <div class="ul-cari">
+    <input type="text" id="ulCari" placeholder="Ketik no. palet, mis. FG-26/10/001" autocapitalize="characters" autocomplete="off" onkeydown="if(event.key==='Enter'){fgCariPalet();}">
+    <button type="button" onclick="fgCariPalet()">Cari</button>
+  </div>
+  <div id="ulangList"></div>
 </div>
 
 <div id="kitirPrintArea">
   <div class="kitir">
     <div class="brand">STP</div>
     <div class="judul">HASIL PRODUKSI FG</div>
+    <div class="tag" id="pTag"></div>
     <div class="ref" id="pPalet">No. Palet: -</div>
     <hr>
     <div class="nama" id="pProduk">-</div>
@@ -110,13 +140,18 @@
 
 <script>
 var WEBAPP_URL='https://script.google.com/macros/s/AKfycbxp5L0rGdC0ki2M18YjNnylr0aAOXDLCzW5k84fJhT7aCkdlFrPeOY2tH0b75MMjDJh/exec';
-var TF_LIST=['TF04','TF05','TF06','TF07','TF08','TF09','TF10','TF12','TF13','TF14','TF15','TF16'];
-var fgLast=null;
+var TF_LIST=['TF5','TF6','TF7','TF8','TF9','TF10','TF12','TF13','TF14','TF15','TF16'];
+var FG_KEY='fgSaved';
+var fgState=null;      // { data, sid } setelah simpan sukses
+var fgDraft=null;      // { sid, json } untuk retry, supaya tidak ganda
+var fgCache=[];        // hasil cari palet
 
 function setMsg(t,c){ var m=document.getElementById('msg'); m.textContent=t; m.className=c||''; }
+function esc(s){ return String(s===null||s===undefined?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function tanggalHariIni(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function jamSekarang(){ var n=new Date(); return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
-function fmtTglIndo(iso){ var p=String(iso).split('-'); return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : iso; }
+function fmtTglIndo(iso){ var p=String(iso||'').split('-'); return p.length===3 ? p[2]+'-'+p[1]+'-'+p[0] : (iso||''); }
+function fgNewSid(){ return 'F'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
 function fgIsiTf(){
   var sel=document.getElementById('fTf');
@@ -124,9 +159,8 @@ function fgIsiTf(){
   TF_LIST.forEach(function(v){ var o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
 }
 
-// Daftar produk dari sheet CODE (F4:F), sama seperti daftar Ukuran di EXT
 function fgMuatProduk(){
-  fetch(WEBAPP_URL+'?action=ukuranList').then(r=>r.json()).then(res=>{
+  fetch(WEBAPP_URL+'?action=ukuranList').then(function(r){return r.json();}).then(function(res){
     var sel=document.getElementById('fProduk');
     sel.innerHTML='<option value="">- pilih -</option>';
     if(res&&res.ok){
@@ -140,6 +174,13 @@ function fgKunci(on){
     document.getElementById(id).disabled=on;
   });
   document.getElementById('btnSave').disabled=on;
+}
+
+function fgTampilSudahSimpan(){
+  fgKunci(true);
+  document.getElementById('btnSave').disabled=true;
+  document.getElementById('btnPrint').disabled=false;
+  document.getElementById('btnShareWA').disabled=false;
 }
 
 function fgAmbilForm(){
@@ -167,42 +208,58 @@ function fgValidasi(d){
   return null;
 }
 
-// 1. Simpan ke sheet FG (palet dibuat backend), lalu cetak struk
-function fgSimpanCetak(){
-  if(fgLast){ setMsg('Data sudah tersimpan. Tekan Kosongkan Form untuk input baru.','bad'); return; }
+// 1. Simpan ke sheet FG. Cetak dilakukan dengan tombol Cetak.
+function fgSimpan(){
+  var msgEl=document.getElementById('msg');
+  if(fgState){ setMsg('Data sudah tersimpan. Pakai Cetak, atau Kosongkan Form untuk input baru.','bad'); return; }
   var d=fgAmbilForm();
   var err=fgValidasi(d);
   if(err){ setMsg(err,'bad'); return; }
 
+  // Retry dengan data yang sama memakai sid yang sama, supaya backend tidak menulis dua kali
+  var json=JSON.stringify(d);
+  if(!fgDraft||fgDraft.json!==json){ fgDraft={sid:fgNewSid(), json:json}; }
+  var sid=fgDraft.sid;
+
+  var payload={_app:'fg',sid:sid,tanggal:d.tanggal,shift:d.shift,tf:d.tf,namaProduk:d.namaProduk,
+               qty:d.qty,gram:d.gram,nama:d.nama,jam:d.jam,bsSheet:d.bsSheet,waste:d.waste};
+
   var btn=document.getElementById('btnSave');
   btn.disabled=true; setMsg('Menyimpan...','');
 
-  var payload={_app:'fg',tanggal:d.tanggal,shift:d.shift,tf:d.tf,namaProduk:d.namaProduk,
-               qty:d.qty,gram:d.gram,nama:d.nama,jam:d.jam,bsSheet:d.bsSheet,waste:d.waste};
-
   fetch(WEBAPP_URL+'?action=save&payload='+encodeURIComponent(JSON.stringify(payload)))
-    .then(r=>r.text())
-    .then(t=>{
+    .then(function(r){ return r.text(); })
+    .then(function(t){
       var res;
       try{ res=JSON.parse(t); }catch(e){ res={ok:false,error:'Respon server: '+t.slice(0,200)}; }
       if(res&&res.ok&&res.palet){
         payload.palet=res.palet;
-        fgLast=payload;
-        fgKunci(true);
-        document.getElementById('btnShare').disabled=false;
-        fgIsiPreview(payload);
-        setMsg('✅ Tersimpan. No. Palet '+res.palet+'. Tekan Share WA, lalu Kosongkan Form untuk input berikutnya.','ok');
-        setTimeout(function(){ window.print(); }, 200);
+        fgState={data:payload, sid:sid};
+        fgDraft=null;
+        try{ localStorage.setItem(FG_KEY, JSON.stringify(fgState)); }catch(e){}
+        fgIsiPreview(payload,false);
+        fgTampilSudahSimpan();
+        setMsg((res.duplicate?'Data sudah tersimpan sebelumnya. ':'✅ Tersimpan. ')+'No. Palet '+res.palet+'. Tekan Cetak jika struk belum keluar.', 'ok');
       } else {
         btn.disabled=false;
-        var pesan=(res&&res.error) ? res.error : 'Server tidak mengembalikan No. Palet. Cek deploy Apps Script.';
-        setMsg('❌ Gagal: '+pesan,'bad');
+        setMsg('❌ Gagal: '+((res&&res.error)||'Server tidak mengembalikan No. Palet')+'. Tekan Simpan lagi, data tidak akan ganda.','bad');
       }
     })
-    .catch(e=>{ btn.disabled=false; setMsg('❌ Gagal: '+e.message,'bad'); });
+    .catch(function(e){
+      btn.disabled=false;
+      setMsg('❌ Gagal: '+e.message+'. Tekan Simpan lagi, data tidak akan ganda.','bad');
+    });
 }
 
-function fgIsiPreview(d){
+// 2. Cetak data yang sudah tersimpan (bisa diulang)
+function fgCetak(){
+  if(!fgState){ setMsg('Belum ada data tersimpan.','bad'); return; }
+  fgIsiPreview(fgState.data,false);
+  setTimeout(function(){ window.print(); }, 300);
+}
+
+function fgIsiPreview(d, ulang){
+  document.getElementById('pTag').textContent = ulang ? '** CETAK ULANG **' : '';
   document.getElementById('pPalet').textContent='No. Palet: '+d.palet;
   document.getElementById('pProduk').textContent=d.namaProduk;
   document.getElementById('pQty').textContent=Number(d.qty).toLocaleString('id-ID')+' Box';
@@ -212,13 +269,13 @@ function fgIsiPreview(d){
   document.getElementById('pShift').textContent='SHIFT '+d.shift;
   document.getElementById('pNama').textContent=d.nama;
   try{
-    JsBarcode("#pBarcode", d.palet, {format:"CODE128", width:1.3, height:55, displayValue:true, fontSize:11, margin:2});
+    JsBarcode("#pBarcode", String(d.palet), {format:"CODE128", width:1.3, height:55, displayValue:true, fontSize:11, margin:2});
   }catch(e){
     document.getElementById('pBarcode').innerHTML='';
   }
 }
 
-// 2. Share WA: teks dari data yang sudah tersimpan, termasuk No. Palet dan Gram
+// 3. Share WA memakai data yang sudah tersimpan
 function fgPesan(d){
   return "📦 HASIL PRODUKSI FG\n"+
     "Tanggal: "+fmtTglIndo(d.tanggal)+" | Jam: "+d.jam+"\n"+
@@ -231,25 +288,99 @@ function fgPesan(d){
 }
 
 function fgShareWa(){
-  if(!fgLast){ setMsg('Simpan & Cetak dulu','bad'); return; }
-  window.open("https://wa.me/?text="+encodeURIComponent(fgPesan(fgLast)),"_blank");
+  if(!fgState){ setMsg('Simpan dulu','bad'); return; }
+  window.open("https://wa.me/?text="+encodeURIComponent(fgPesan(fgState.data)),"_blank");
+  setMsg('WhatsApp dibuka. Data masih ada di form.','ok');
 }
 
-// 3. Kosongkan form, satu-satunya cara untuk input berikutnya
+// 4. Cari cetak ulang: ketik no. palet, hasil hanya dibaca
+function fgBukaCari(){
+  var p=document.getElementById('ulangPanel');
+  p.style.display='block';
+  document.getElementById('ulCari').focus();
+  p.scrollIntoView({behavior:'smooth'});
+}
+
+function fgTutupCari(){ document.getElementById('ulangPanel').style.display='none'; }
+
+function fgCariPalet(){
+  var kode=document.getElementById('ulCari').value.trim();
+  var list=document.getElementById('ulangList');
+  if(!kode){ list.innerHTML='<div class="bad">Ketik no. palet dulu.</div>'; return; }
+  list.innerHTML='<div style="color:var(--mute);font-size:12.5px">Mencari...</div>';
+  fetch(WEBAPP_URL+'?action=fgcari&palet='+encodeURIComponent(kode))
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if(!res||!res.ok){ list.innerHTML='<div class="bad">'+esc(res&&res.error?res.error:'Tidak ditemukan')+'</div>'; return; }
+      fgCache=res.items||[];
+      if(!fgCache.length){ list.innerHTML='<div style="color:var(--mute);font-size:12.5px">No. palet tidak ditemukan.</div>'; return; }
+      var html='';
+      fgCache.forEach(function(it,idx){
+        html+='<div class="ul-item">'+
+          '<div class="t">'+esc(it.palet)+'</div>'+
+          '<div class="s">'+esc(it.namaProduk)+' | Qty '+esc(it.qty)+(it.gram!==''?' | Gram '+esc(it.gram):'')+'</div>'+
+          '<div class="s">TF '+esc(it.tf)+' | '+esc(it.tanggalTxt)+' '+esc(it.jam)+' | Shift '+esc(it.shift)+'</div>'+
+          '<div class="s">Operator: '+esc(it.nama)+'</div>'+
+          '<button type="button" onclick="fgCetakUlang('+idx+')">🖨 Cetak Ulang</button>'+
+        '</div>';
+      });
+      list.innerHTML=html;
+    })
+    .catch(function(e){ list.innerHTML='<div class="bad">Gagal mencari: '+esc(e.message)+'</div>'; });
+}
+
+// Cetak ulang: hanya membaca data hasil cari, tidak menulis ke sheet dan tidak mengubah form
+function fgCetakUlang(idx){
+  var it=fgCache[idx];
+  if(!it) return;
+  var d={
+    palet: it.palet,
+    namaProduk: it.namaProduk,
+    qty: it.qty,
+    gram: it.gram,
+    tf: it.tf,
+    tanggal: it.tanggal || tanggalHariIni(),
+    jam: it.jam,
+    shift: it.shift,
+    nama: it.nama
+  };
+  fgIsiPreview(d,true);
+  setTimeout(function(){ window.print(); }, 300);
+}
+
+// 5. Kosongkan form, satu-satunya cara untuk input baru
 function fgKosongkan(){
-  fgLast=null;
+  fgState=null;
+  fgDraft=null;
+  try{ localStorage.removeItem(FG_KEY); }catch(e){}
   ['fShift','fTf','fProduk','fQty','fGram','fNama','fBsSheet','fWaste'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('fTanggal').value=tanggalHariIni();
   document.getElementById('fJam').value=jamSekarang();
-  document.getElementById('btnShare').disabled=true;
   fgKunci(false);
+  document.getElementById('btnSave').disabled=false;
+  document.getElementById('btnPrint').disabled=true;
+  document.getElementById('btnShareWA').disabled=true;
   setMsg('Form dikosongkan. Siap untuk input berikutnya.','ok');
+}
+
+// Saat halaman dibuka ulang, pulihkan status tersimpan dari browser
+function fgPulihkan(){
+  var raw=null;
+  try{ raw=localStorage.getItem(FG_KEY); }catch(e){}
+  if(!raw) return;
+  try{
+    fgState=JSON.parse(raw);
+    fgIsiPreview(fgState.data,false);
+    fgTampilSudahSimpan();
+    setMsg('Ada data tersimpan. Tekan Cetak jika struk belum keluar, atau Kosongkan Form untuk input baru.','ok');
+  }catch(e){ fgState=null; try{ localStorage.removeItem(FG_KEY); }catch(_){} }
 }
 
 document.getElementById('fTanggal').value=tanggalHariIni();
 document.getElementById('fJam').value=jamSekarang();
 fgIsiTf();
 fgMuatProduk();
+fgPulihkan();
 </script>
 </body>
 </html>
